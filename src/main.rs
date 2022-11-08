@@ -5,12 +5,6 @@ enum IpAddr {
     V6(String)
 }
 
-// impl IpAddr {
-//     fn to_string(&self) -> String {
-        
-//     }
-// }
-
 impl fmt::Display for IpAddr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
