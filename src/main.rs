@@ -1,13 +1,21 @@
+use std::fmt;
+
 enum IpAddr {
     V4(u8, u8, u8, u8),
     V6(String)
 }
 
-impl IpAddr {
-    fn to_string(&self) -> String {
+// impl IpAddr {
+//     fn to_string(&self) -> String {
+        
+//     }
+// }
+
+impl fmt::Display for IpAddr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            IpAddr::V4(a, b, c, d) => return format!("{a}.{b}.{c}.{d}"),
-            IpAddr::V6(string) => return string.to_string()
+            IpAddr::V4(a, b, c, d) => write!(f, "{}.{}.{}.{}", a, b, c, d),
+            IpAddr::V6(string) => write!(f, "{}", string)
         }
     }
 }
@@ -25,7 +33,7 @@ struct Server {
 
 impl Server {
     fn send(&self, msg: &Message) {
-        print!("Sending to {} => ", self.ip.to_string());
+        print!("Sending to {} => ", self.ip);
         match msg {
             Message::Quit => {
                 println!("Quit");
