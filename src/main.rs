@@ -1,75 +1,100 @@
-use std::fmt;
+use std::thread;
+use std::net::{TcpListener, TcpStream, Shutdown};
+use std::io::{Read, Write};
+use std::io;
+use std::str::from_utf8;
 
-enum IpAddr {
-    V4(u8, u8, u8, u8),
-    V6(String)
-}
-
-impl fmt::Display for IpAddr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            IpAddr::V4(a, b, c, d) => write!(f, "{}.{}.{}.{}", a, b, c, d),
-            IpAddr::V6(string) => write!(f, "{}", string)
+fn handle_client(mut stream: TcpStream) {
+    let mut data = [0_u8; 50]; // using 50 byte buffer
+    while match stream.read(&mut data) {
+        Ok(size) => {
+            // echo everything!
+            stream.write_all(&data[0..size]).unwrap();
+            true
+        },
+        Err(_) => {
+            println!("An error occurred, terminating connection with {}", stream.peer_addr().unwrap());
+            stream.shutdown(Shutdown::Both).unwrap();
+            false
         }
-    }
+    } {}
 }
 
-enum Message {
-    Quit,
-    Move { x: i32, y: i32 },
-    Write(String),
-    ChangeColor(i32, i32, i32),
-}
-
-struct Server {
-    ip: IpAddr,
-}
-
-impl Server {
-    fn send(&self, msg: &Message) {
-        print!("Sending to {} => ", self.ip);
-        match msg {
-            Message::Quit => {
-                println!("Quit");
+fn do_server() {
+    let listener = TcpListener::bind("0.0.0.0:3333").unwrap();
+    // accept connections and process them, spawning a new thread for each one
+    println!("Server listening on port 3333");
+    for stream in listener.incoming() {
+        match stream {
+            Ok(stream) => {
+                println!("New connection: {}", stream.peer_addr().unwrap());
+                thread::spawn(move|| {
+                    // connection succeeded
+                    handle_client(stream)
+                });
             }
-            Message::Move { x, y } => {
-                println!("Moved to: {x} {y}");
-            }
-            Message::Write(string) => {
-                println!("Sent: {string}");
-            }
-            Message::ChangeColor(x, y, z) => {
-                println!("Changed color to: {:?}", (x,y,z));
+            Err(e) => {
+                println!("Error: {}", e);
+                /* connection failed */
             }
         }
     }
+    // close the socket server
+    drop(listener);
 }
 
-impl Message {
-    fn call(&self, server: &Server) {
-        server.send(self);
+fn do_client() {
+    match TcpStream::connect("localhost:3333") {
+        Ok(mut stream) => {
+            println!("Successfully connected to server in port 3333");
+
+            let msg = b"Hello!";
+
+            stream.write_all(msg).unwrap();
+            println!("Sent Hello, awaiting reply...");
+
+            let mut data = [0_u8; 6]; // using 6 byte buffer
+            match stream.read_exact(&mut data) {
+                Ok(_) => {
+                    if &data == msg {
+                        println!("Reply is ok!");
+                    } else {
+                        let text = from_utf8(&data).unwrap();
+                        println!("Unexpected reply: {}", text);
+                    }
+                },
+                Err(e) => {
+                    println!("Failed to receive data: {}", e);
+                }
+            }
+        },
+        Err(e) => {
+            println!("Failed to connect: {}", e);
+        }
     }
+    println!("Terminated.");
+}
+
+fn ask(prompt: &str) -> String {
+    print!("{}", prompt);
+    std::io::stdout()
+        .flush()
+        .unwrap();
+
+    let mut answer = String::new();
+    io::stdin()
+        .read_line(&mut answer)
+        .expect("failed to readline");
+    answer
 }
 
 
-fn main() {
-    let sv = Server {ip: IpAddr::V4(127,0,0,1) };
-    let sv2 = Server {ip: IpAddr::V6("::1".into()) };
+fn main() { 
+    let answer = ask("do server or client: ");
 
-    let m = Message::Write(String::from("hello"));
-    m.call(&sv);
-
-    let color = Message::ChangeColor(255, 255, 255);
-    color.call(&sv);
-
-    let move_msg = Message::Move{x: 16, y:32};
-    move_msg.call(&sv);
-
-    let quit_server = Message::Quit;
-    quit_server.call(&sv);
-
-    m.call(&sv2);
-    color.call(&sv2);
-    move_msg.call(&sv2);
-    quit_server.call(&sv2);
+    match answer.trim() {
+        "server" => do_server(),
+        "client" => do_client(),
+        &_ => println!("invalid answer: type server or client")
+    }
 }
