@@ -85,14 +85,14 @@ fn ask(prompt: &str) -> String {
     io::stdin()
         .read_line(&mut answer)
         .expect("failed to readline");
-    answer
+    answer.trim().into()
 }
 
 
 fn main() { 
     let answer = ask("do server or client: ");
 
-    match answer.trim() {
+    match answer.as_str() {
         "server" => do_server(),
         "client" => do_client(),
         &_ => println!("invalid answer: type server or client")
